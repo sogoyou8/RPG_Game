@@ -1,5 +1,5 @@
 import os
-from random import randint
+from random import randint, random
 from colorama import Fore, Style
 from entity import Mob, Player
 from objects import Object
@@ -199,13 +199,13 @@ class RPGGame(Game):
         print(f"Sauvegarde '{file_to_delete}' supprimée avec succès.")
 
     def deplacer(self, direction):
-        if direction == "1" and self.player.y > 0:  # North
+        if direction == "8" and self.player.y > 0:  # North
             self.player.y -= 1
             print("Vous allez vers le nord.")
-        elif direction == "2" and self.player.x < len(self.map[0]) - 1:  # East
+        elif direction == "6" and self.player.x < len(self.map[0]) - 1:  # East
             self.player.x += 1
             print("Vous allez vers l'est.")
-        elif direction == "3" and self.player.y < len(self.map) - 1:  # South
+        elif direction == "2" and self.player.y < len(self.map) - 1:  # South
             self.player.y += 1
             print("Vous allez vers le sud.")
         elif direction == "4" and self.player.x > 0:  # West
@@ -215,19 +215,19 @@ class RPGGame(Game):
             print("Déplacement impossible dans cette direction.")
             return
         
-        if self.map[self.player.y][self.player.x].ennemy & randint(0, 8) == 1:
+        if self.map[self.player.y][self.player.x].ennemy & randint(0, 3) == 1:
             self.fight = True
             print("Un ennemi apparaît !")
-            self.battle()
+            self.battle(self.mobs[randint(0, len(self.mobs) - 1)])
 
     def possible_moves(self):
         moves = []
         if self.player.y > 0:  # Nord
-            moves.append("1")  # 1 correspond à Nord
+            moves.append("8")  # 8 correspond à Nord
         if self.player.x < len(self.map[0]) - 1:  # Est
-            moves.append("2")  # 2 correspond à Est
+            moves.append("6")  # 6 correspond à Est
         if self.player.y < len(self.map) - 1:  # Sud
-            moves.append("3")  # 3 correspond à Sud
+            moves.append("2")  # 4 correspond à Sud
         if self.player.x > 0:  # Ouest
             moves.append("4")  # 4 correspond à Ouest
         return moves
@@ -242,12 +242,18 @@ class RPGGame(Game):
             print(f"ELIXIRS : {self.player.inventory['elixir'].count}")
             print(f"BOOST ATTAQUE : {self.player.inventory['atk_boost'].count}")
             print(f"BOOST DÉFENSE : {self.player.inventory['def_boost'].count}")
+            print(f"MAGIC SCROLL : {self.player.inventory['magic_scroll'].count}")
+            print(f"SHIELD : {self.player.inventory['shield'].count}")
+            print(f"SWORD : {self.player.inventory['sword'].count}")
             print("=" * 30)
             print("0 - Quitter")
             print("1 - Acheter POTION (5 or)")
             print("2 - Acheter ELIXIR (8 or)")
             print("3 - Acheter BOOST ATTAQUE (10 or)")
             print("4 - Acheter BOOST DÉFENSE (10 or)")
+            print("5 - Acheter MAGIC SCROLL (15 or)")  
+            print("6 - Acheter SHIELD (20 or)")        
+            print("7 - Acheter SWORD (25 or)")    
             print("=" * 30)
 
             choice = input("Choisis une option : ")
@@ -300,6 +306,24 @@ class RPGGame(Game):
                         print("Achat annulé.")
                 else:
                     print("Pas assez d'or.")
+            elif choice == "5":
+                if self.player.gold >= 15:
+                    confirm = input("Confirmer l'achat de MAGIC SCROLL pour 15 or ? (o/n) : ").lower()
+                    if confirm == 'o':
+                        self.player.inventory["magic_scroll"].count += 1
+                        self.player.gold -= 15
+            elif choice == "6":
+                if self.player.gold >= 20:
+                    confirm = input("Confirmer l'achat de SHIELD pour 20 or ? (o/n) : ").lower()
+                    if confirm == 'o':
+                        self.player.inventory["shield"].count += 1
+                        self.player.gold -= 20
+            elif choice == "7":
+                if self.player.gold >= 25:
+                    confirm = input("Confirmer l'achat de SWORD pour 25 or ? (o/n) : ").lower()
+                    if confirm == 'o':
+                        self.player.inventory["sword"].count += 1
+                        self.player.gold -= 25
             elif choice == "0":
                 break
             else:
@@ -318,7 +342,7 @@ class RPGGame(Game):
         else:
             print("Vous sortez de la grotte.")
 
-    def battle(self, isBoss=False):
+    def battle(self, enemy, isBoss=False):
         if len(self.mobs) == 0 and not isBoss:
             return
         self.fight = True
@@ -329,39 +353,70 @@ class RPGGame(Game):
         else:
             id = randint(0, len(self.mobs) - 1)
             enemy = self.mobs[id]
-        print(f"Un {enemy.name} apparaît !")
+        print(f"Un {enemy.name} apparaît !(Niveau {enemy.level})")
+
+        miss_chance = 0.1
+        crit_chance = 0.08
+        crit_multiplier = 1.8
+
         while self.fight:
             print(f"{self.player.name} HP: {self.player.HP}")
-            print(f"{enemy.name} HP: {enemy.HP}")
+            print(f"{enemy.name} HP: {enemy.HP} (Niveau {enemy.level})")
             print("1 - Attaquer")
             print("2 - Utiliser un objet")
             print("3 - Fuir")
             choice = input("# ")
             if choice == "1":
                 # Attaque du joueur
-                damage = self.player.ATK - enemy.DEF
-                if damage < 0:
+                if random() < miss_chance:
+                    print("Votre attaque a échoué !")
                     damage = 0
-                enemy.HP -= damage
+                else:
+                    # Calcul des dégâts
+                    damage = self.player.ATK - enemy.DEF
+                    if damage < 0:
+                        damage = 0
+                
+                # Vérifier si c'est un coup critique
+                if random() < crit_chance:
+                    damage = int(damage * crit_multiplier)
+                    print("Coup critique!")
+                enemy.HP -= damage    
                 print(f"Vous infligez {damage} points de dégâts à {enemy.name}!")
                 if enemy.HP <= 0:
                     print(f"Vous avez vaincu le {enemy.name}!")
                     self.fight = False
                     self.gain_xp(enemy.XP)
                     self.player.gold += enemy.gold
+                    loot = enemy.loot()
+                    self.player.inventory[loot].count += 1
+                    print(f"Vous avez obtenu un(e) {loot}!")
                     print(f"{self.player.name} a gagné {enemy.gold} XP!")
                     if not isBoss:
                         enemy.HP = enemy.base_HP
                         self.mobs.pop(id)
+                    input("Appuyez sur une touche pour continuer...")
                     break
                 # Attaque de l'ennemi
-                damage = enemy.ATK - self.player.DEF
-                if damage < 0:
+                if random() < miss_chance:
+                    print(f"{enemy.name} a raté son attaque !")
                     damage = 0
-                self.player.HP -= damage
-                print(f"{enemy.name} vous inflige {damage} points de dégâts!")
+                else:
+                    damage = enemy.ATK - self.player.DEF
+                    if damage < 0:
+                        damage = 0
+                    
+                    # Vérifier si c'est un coup critique
+                    if random() < crit_chance:
+                        damage = int(damage * crit_multiplier)
+                        print("Coup critique de l'ennemi !")
+                    
+                    self.player.HP -= damage
+                    print(f"{enemy.name} vous inflige {damage} points de dégâts!")
+                
                 if self.player.HP <= 0:
                     print("Vous avez été vaincu!")
+                    input("Appuyez sur une touche pour continuer...")
                     self.fight = False
                     enemy.HP = enemy.base_HP
                     break
@@ -399,8 +454,8 @@ class RPGGame(Game):
 
     def confirm_and_use_item(self, item_key, effect_description, effect_function):
         if self.player.inventory[item_key].count > 0:
-            confirm = input(f"Confirmer l'utilisation de {effect_description} ? (oui/non) : ").lower()
-            if confirm == "oui":
+            confirm = input(f"Confirmer l'utilisation de {effect_description} ? (o/n) : ").lower()
+            if confirm == "o":
                 self.player.inventory[item_key].count -= 1
                 effect_function()  # Appelle la fonction d'effet
                 print(f"Vous avez utilisé {effect_description.lower()} !")
@@ -416,15 +471,13 @@ class RPGGame(Game):
             print("Inventaire :")
             print("=" * 30)
             print("0 - Annuler")
-            print(
-                f"1 - POTION ({self.player.inventory['potion'].count} disponibles) (+30 HP)")
-            
-            print(
-                f"2 - ELIXIR ({self.player.inventory['elixir'].count} disponibles) (+50 HP)")
-            print(
-                f"3 - BOOST ATTAQUE ({self.player.inventory['atk_boost'].count} disponibles) (+2 ATK)")
-            print(
-                f"4 - BOOST DÉFENSE ({self.player.inventory['def_boost'].count} disponibles) (+2 DEF)")
+            print(f"1 - POTION ({self.player.inventory['potion'].count} disponibles) (+30 HP)")
+            print(f"2 - ELIXIR ({self.player.inventory['elixir'].count} disponibles) (+50 HP)")
+            print(f"3 - BOOST ATTAQUE ({self.player.inventory['atk_boost'].count} disponibles) (+2 ATK)")
+            print(f"4 - BOOST DÉFENSE ({self.player.inventory['def_boost'].count} disponibles) (+2 DEF)")
+            print(f"5 - MAGIC SCROLL ({self.player.inventory['magic_scroll'].count} disponibles) (Effet spécial)")  # Nouvelle option
+            print(f"6 - SHIELD ({self.player.inventory['shield'].count} disponibles) (+5 DEF)")  # Nouvelle option
+            print(f"7 - SWORD ({self.player.inventory['sword'].count} disponibles) (+5 ATK)")  # Nouvelle option
             print("=" * 30)
 
             choice = input("Choisis un objet à utiliser : ")
@@ -443,13 +496,52 @@ class RPGGame(Game):
             elif choice == "4":
                 self.confirm_and_use_item(
                     "def_boost", "BOOST DÉFENSE", lambda: self.increase_stat("DEF", 2))
+            elif choice == "5":
+                self.confirm_and_use_item("magic_scroll", "MAGIC SCROLL", lambda: self.special_effect())
+            elif choice == "6":
+                self.confirm_and_use_item("shield", "SHIELD", lambda: self.increase_stat("DEF", 5))
+            elif choice == "7":
+                self.confirm_and_use_item("sword", "SWORD", lambda: self.increase_stat("ATK", 5))
             else:
                 print("Choix invalide.")
 
+    def special_effect(self):
+        # Restaure complètement les points de vie du joueur
+        self.player.HP = self.player.HPMAX
+        print("Vos points de vie ont été complètement restaurés !")
+
+        # Augmente temporairement les statistiques d'attaque et de défense
+        original_atk = self.player.ATK
+        original_def = self.player.DEF
+        self.player.ATK += 5
+        self.player.DEF += 5
+        print("Votre attaque et votre défense ont été augmentées de 5 points pour le prochain combat !")
+
+        # Effet temporaire pour un combat
+        self.temp_effects.append({
+            "type": "stat_boost",
+            "duration": 1,  # Durée en nombre de combats
+            "original_atk": original_atk,
+            "original_def": original_def
+        })
+
+    def apply_temp_effects(self):
+        for effect in self.temp_effects:
+            if effect["type"] == "stat_boost":
+                effect["duration"] -= 1
+                if effect["duration"] <= 0:
+                    self.player.ATK = effect["original_atk"]
+                    self.player.DEF = effect["original_def"]
+                    print("Les effets temporaires du MAGIC SCROLL se sont dissipés.")
+                    self.temp_effects.remove(effect)
+
     # Fonction pour ajuster une statistique
     def increase_stat(self, stat, amount):
-        setattr(self.player, stat, getattr(self.player, stat) + amount)
-        print(f"{stat} augmenté de {amount}!")
+        if stat == "ATK":
+            self.player.ATK += amount
+        elif stat == "DEF":
+            self.player.DEF += amount
+        print(f"{stat} augmenté de {amount} points.")
 
     def entrer(self):
         location = self.map[self.player.y][self.player.x].name
@@ -484,7 +576,7 @@ class RPGGame(Game):
             line = ""
             for j in range(len(self.map[i])):
                 if i == self.player.y and j == self.player.x:
-                    line += "[P] "  # P pour Player
+                    line += "[☼] "  # P pour Player
                 else:
                     # Première lettre de chaque biome
                     line += self.map[i][j].name[0].upper() + " "
@@ -506,19 +598,19 @@ class RPGGame(Game):
             # Obtenir les mouvements possibles
             moves_possibles = self.possible_moves()
             print("0 - Quitter")
-            if "1" in moves_possibles:
-                print("1 - NORTH ↑")
+            if "8" in moves_possibles:
+                print("8 - NORTH ↑")
+            if "6" in moves_possibles:
+                print("6 - EAST →")
             if "2" in moves_possibles:
-                print("2 - EAST →")
-            if "3" in moves_possibles:
-                print("3 - SOUTH ↓")
+                print("2 - SOUTH ↓")
             if "4" in moves_possibles:
                 print("4 - WEST ←")
             print("5 - Utiliser un objet")
 
             # Afficher l'option d'entrer seulement si c'est possible
             if self.peut_entrer():
-                print("6 - Entrer")
+                print("1 - Entrer")
 
             choice = input("Choisis une option : ")
 
@@ -530,7 +622,7 @@ class RPGGame(Game):
                 self.deplacer(choice)
             elif choice == "5":
                 self.utiliser_objet()
-            elif choice == "6" and self.peut_entrer():
+            elif choice == "1" and self.peut_entrer():
                 self.entrer()
             else:
                 print("Choix invalide.")
